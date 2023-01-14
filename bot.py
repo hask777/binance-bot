@@ -11,18 +11,15 @@ from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 from futures_sign import send_signed_request, send_public_request
 from cred import KEY, SECRET
 
-
 symbol='ETHUSDT'
 client = Client(KEY, SECRET)
 
-maxposition=0.015
+maxposition=0.03
 stop_percent=0.01 # 0.01=1%
-eth_proffit_array=[[20,1],[40,1],[60,2],[80,2],[100,2],[150,1],[200,1],[200,0]]
+eth_proffit_array=[[5,1],[7,1],[10,2],[15,2],[15,2]]
 proffit_array=copy.copy(eth_proffit_array)
 
 pointer=str(random.randint(1000, 9999))
-
-# Get last 500 kandels 5 minutes for Symbol
 
 def get_futures_klines(symbol,limit=500):
     x = requests.get('https://binance.com/fapi/v1/klines?symbol='+symbol+'&limit='+str(limit)+'&interval=5m')
@@ -241,15 +238,52 @@ def check_if_signal(symbol):
                 signal='short'
 
     return signal
+    
+telegram_delay=12
+bot_token='5582077058:AAFRM8JIRoxo3CmRmFs3onvBGUckzWFq5uQ' # вставьте токен из бота @BotFather
+chat_id='5650732610' # вставьте id из бота @getmyid_bot
+
+def getTPSLfrom_telegram():
+    strr='https://api.telegram.org/bot'+bot_token+'/getUpdates'
+    response = requests.get(strr)
+    rs=response.json()
+    if(len(rs['result'])>0):
+        rs2=rs['result'][-1]
+        rs3=rs2['message']
+        textt=rs3['text']
+        datet=rs3['date']
+
+        if(time.time()-datet)<telegram_delay:
+            if 'quit' in textt:
+                quit()
+            if 'exit' in textt:
+                exit()
+            if 'hello' in textt:
+                telegram_bot_sendtext('Hello. How are you?')
+            if 'close_pos' in textt:
+                position=get_opened_positions(symbol)
+                open_sl=position[0]
+                quantity=position[1]
+                print(open_sl,quantity)
+                close_position(symbol,open_sl,abs(quantity))
+            
+def telegram_bot_sendtext(bot_message):
+    bot_token2 = bot_token
+    bot_chatID = chat_id
+    send_text = 'https://api.telegram.org/bot' + bot_token2 + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + bot_message
+    response = requests.get(send_text)
+    return response.json()
 
 def prt(message):
     # telegram message
+    telegram_bot_sendtext(pointer+': '+message)
     print(pointer+': '+message)
 
 def main(step):
     global proffit_array
 
     try:
+        getTPSLfrom_telegram()
         position=get_opened_positions(symbol)
         open_sl=position[0]
         if open_sl=="": # no position
@@ -319,8 +353,8 @@ while time.time() <= timeout:
         counterr=counterr+1
         if counterr>5:
             counterr=1
-        time.sleep(10 - ((time.time() - starttime) % 10.0)) # 1 minute interval between each new execution
+        time.sleep(20 - ((time.time() - starttime) % 20.0)) # 1 minute interval between each new execution
     except KeyboardInterrupt:
         print('\n\KeyboardInterrupt. Stopping.')
         exit()
-
+        
