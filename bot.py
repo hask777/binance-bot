@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
 import requests
 import numpy as np
 import pandas as pd
@@ -18,21 +15,16 @@ from futures_sign import send_signed_request, send_public_request
 from cred import KEY, SECRET
 
 
-# In[3]:
-
-
 symbol='ETHUSDT'
 client = Client(KEY, SECRET)
 
 maxposition=0.03
 stop_percent=0.01 # 0.01=1%
-eth_proffit_array=[[3,1],[5,1],[10,1],[20,1],[40,1],[60,2],[80,2],[100,2],[150,1],[200,1],[200,0]]
+eth_proffit_array=[[20,1],[40,1],[60,2],[80,2],[100,2],[150,1],[200,1],[200,0]]
 proffit_array=copy.copy(eth_proffit_array)
 
 pointer=str(random.randint(1000, 9999))
 
-
-# In[4]:
 
 
 # Get last 500 kandels 5 minutes for Symbol
@@ -49,8 +41,6 @@ def get_futures_klines(symbol,limit=500):
     df['volume']=df['volume'].astype(float)
     return(df)
 
-
-# In[5]:
 
 
 # Open position for Sybol with 
@@ -94,10 +84,6 @@ def open_position(symbol,s_l,quantity_l):
         responce = send_signed_request('POST', '/fapi/v1/batchOrders', params)
         
 
-
-# In[6]:
-
-
 # Close position for symbol with quantity
 
 def close_position(symbol,s_l,quantity_l):
@@ -133,10 +119,6 @@ def close_position(symbol,s_l,quantity_l):
         print (responce)
 
 
-
-# In[7]:
-
-
 # Find all opened positions
 
 def get_opened_positions(symbol):
@@ -156,10 +138,6 @@ def get_opened_positions(symbol):
     return([pos,a,profit,leverage,balance,round(float(entryprice),3),0])
 
 
-
-# In[8]:
-
-
 # Close all orders 
 
 def check_and_close_orders(symbol):
@@ -170,8 +148,6 @@ def check_and_close_orders(symbol):
         client.futures_cancel_all_open_orders(symbol=symbol)
 
 
-# In[9]:
-
 
 def get_symbol_price(symbol):
     prices = client.get_all_tickers()
@@ -179,13 +155,8 @@ def get_symbol_price(symbol):
     return float(df[ df['symbol']==symbol]['price'])
 
 
-# In[10]:
-
 
 # INDICATORS
-
-
-# In[11]:
 
 
 # To find a slope of price line 
@@ -206,9 +177,6 @@ def indSlope(series,n):
     return np.array(slope_angle)
 
 
-# In[12]:
-
-
 # True Range and Average True Range indicator
 
 def indATR(source_DF,n):
@@ -220,9 +188,6 @@ def indATR(source_DF,n):
     df['ATR'] = df['TR'].rolling(n).mean()
     df_temp = df.drop(['H-L','H-PC','L-PC'],axis=1)
     return df_temp
-
-
-# In[13]:
 
 
 # find local mimimum / local maximum
@@ -245,9 +210,6 @@ def isHCC(DF,i):
     return HCC
 
 
-# In[14]:
-
-
 
 def getMaxMinChannel(DF, n):
     maxx=0
@@ -259,8 +221,6 @@ def getMaxMinChannel(DF, n):
             minn=DF['low'][len(DF)-i]
     return(maxx,minn)
 
-
-# In[15]:
 
 
 # generate data frame with all needed data
@@ -278,8 +238,6 @@ def PrepareDF(DF):
     df = df.reset_index()
     return(df)
 
-
-# In[16]:
 
 
 def check_if_signal(symbol):
@@ -309,22 +267,53 @@ def check_if_signal(symbol):
     
 
 
-# In[17]:
+telegram_delay=12
+bot_token=''
+chat_id=''
 
+def getTPSLfrom_telegram():
+    strr='https://api.telegram.org/bot'+bot_token+'/getUpdates'
+    response = requests.get(strr)
+    rs=response.json()
+    if(len(rs['result'])>0):
+        rs2=rs['result'][-1]
+        rs3=rs2['message']
+        textt=rs3['text']
+        datet=rs3['date']
+
+        if(time.time()-datet)<telegram_delay:
+            if 'quit' in textt:
+                quit()
+            if 'exit' in textt:
+                exit()
+            if 'hello' in textt:
+                telegram_bot_sendtext('Hello. How are you?')
+            if 'close_pos' in textt:
+                position=get_opened_positions(symbol)
+                open_sl=position[0]
+                quantity=position[1]
+              #  print(open_sl,quantity)
+                close_position(symbol,open_sl,abs(quantity))
+            
+def telegram_bot_sendtext(bot_message):
+    bot_token2 = bot_token
+    bot_chatID = chat_id
+    send_text = 'https://api.telegram.org/bot' + bot_token2 + '/sendMessage?chat_id=' + bot_chatID + '&parse_mode=Markdown&text=' + bot_message
+    response = requests.get(send_text)
+    return response.json()
+            
 
 def prt(message):
     # telegram message
+    telegram_bot_sendtext(pointer+': '+message)
     print(pointer+': '+message)
     
-
-
-# In[18]:
-
 
 def main(step):
     global proffit_array
 
     try:
+        getTPSLfrom_telegram()
         position=get_opened_positions(symbol)
         open_sl=position[0]
         if open_sl=="": # no position
@@ -384,8 +373,6 @@ def main(step):
         prt('\n\nSomething went wrong. Continuing...')
 
 
-# In[ ]:
-
 
 starttime=time.time()
 timeout = time.time() + 60*60*12  # 60 seconds times 60 meaning the script will run for 12 hr
@@ -398,15 +385,9 @@ while time.time() <= timeout:
         counterr=counterr+1
         if counterr>5:
             counterr=1
-        time.sleep(30 - ((time.time() - starttime) % 30.0)) # 1 minute interval between each new execution
+        time.sleep(10 - ((time.time() - starttime) % 10.0)) # 1 minute interval between each new execution
     except KeyboardInterrupt:
         print('\n\KeyboardInterrupt. Stopping.')
         exit()
         
-
-
-# In[ ]:
-
-
-
 
